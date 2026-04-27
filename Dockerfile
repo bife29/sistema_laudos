@@ -2,15 +2,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Dependências do sistema para MNE-Python
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc g++ && rm -rf /var/lib/apt/lists/*
-
 COPY pyproject.toml .
-RUN pip install --no-cache-dir -e ".[prod]" 2>/dev/null || pip install --no-cache-dir .
+RUN pip install --no-cache-dir -e ".[prod]" 2>/dev/null || pip install --no-cache-dir . && pip install asyncpg
 
 COPY backend/ backend/
 COPY .env* ./
+
+# Diretório para uploads temporários
+RUN mkdir -p /app/data/uploads
 
 EXPOSE 8000
 

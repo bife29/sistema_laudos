@@ -14,21 +14,26 @@ def read_edf(file_path: str) -> dict:
     """
     Lê um arquivo .EDF e retorna metadados + dados brutos.
     Usa edfio (leve) em vez de MNE para economizar memória.
+    Carrega dados de forma lazy para limitar uso de RAM.
     """
     from edfio import read_edf as edfio_read
 
-    edf = edfio_read(file_path)
+    edf = edfio_read(file_path, lazy_load_data=True)
 
     channel_names = [signal.label.strip() for signal in edf.signals]
     sampling_rate = float(edf.signals[0].sampling_frequency)
     n_channels = len(edf.signals)
-    duration_seconds = float(edf.duration.total_seconds())
+    # edf.duration pode ser float (segundos) ou timedelta dependendo da versão
+    dur = edf.duration
+    duration_seconds = float(dur.total_seconds()) if hasattr(dur, 'total_seconds') else float(dur)
 
-    # Limite de amostras a carregar
+    # Limite de amostras a carregar (60s max)
     max_samples = int(min(MAX_DURATION_SECONDS, duration_seconds) * sampling_rate)
 
-    # Carregar dados como array numpy (canais x amostras)
-    data = np.array([signal.data[:max_samples] for signal in edf.signals])
+    # Pre-alocar array e preencher canal por canal (evita pico de memória)
+    data = np.empty((n_channels, max_samples), dtype=np.float64)
+    for i, signal in enumerate(edf.signals):
+        data[i] = signal.data[:max_samples]
 
     metadata = {
         "n_channels": n_channels,
@@ -45,12 +50,14 @@ def validate_edf(file_path: str) -> dict:
     """Valida se o arquivo é um EDF válido e retorna metadados."""
     try:
         from edfio import read_edf as edfio_read
-        edf = edfio_read(file_path)
+        edf = edfio_read(file_path, lazy_load_data=True)
+        dur = edf.duration
+        duration_seconds = float(dur.total_seconds()) if hasattr(dur, 'total_seconds') else float(dur)
         return {
             "valid": True,
             "n_channels": len(edf.signals),
             "sampling_rate": float(edf.signals[0].sampling_frequency),
-            "duration_seconds": float(edf.duration.total_seconds()),
+            "duration_seconds": duration_seconds,
             "channel_names": [s.label.strip() for s in edf.signals],
         }
     except Exception as e:
