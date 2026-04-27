@@ -10,7 +10,8 @@ Sistema web que utiliza Inteligência Artificial para auxiliar médicos na elabo
 2. **Leitura automática** dos 19 canais do EEG
 3. **Análise com IA** — detecta padrões anormais, assimetrias, ritmo de base
 4. **Geração de laudo** em linguagem médica profissional (via Claude/OpenAI/Ollama)
-5. **Revisão** pelo médico e exportação em PDF
+5. **Base de conhecimento (RAG)** — laudos aprovados e livros de referência enriquecem os próximos laudos
+6. **Revisão** pelo médico e exportação em PDF
 
 ---
 
@@ -23,7 +24,8 @@ Sistema de Laudos/
 │       ├── api/                  # Rotas da API
 │       │   ├── auth.py           # Login, registro, JWT
 │       │   ├── patients.py       # CRUD de pacientes
-│       │   └── exams.py          # Upload, análise, laudo
+│       │   ├── exams.py          # Upload, análise, laudo
+│       │   └── references.py     # Upload de livros e referências (RAG)
 │       ├── core/                 # Configuração central
 │       │   ├── config.py         # Todas as variáveis (.env)
 │       │   ├── database.py       # Conexão com banco
@@ -35,7 +37,10 @@ Sistema de Laudos/
 │       ├── services/
 │       │   ├── llm_provider.py   # LLM parametrizável (Anthropic/OpenAI/Ollama)
 │       │   ├── storage.py        # Storage parametrizável (Local/S3/MinIO)
-│       │   └── report_generator.py  # Geração de laudos
+│       │   ├── report_generator.py  # Geração de laudos
+│       │   ├── embedding_service.py # Embeddings para busca semântica (RAG)
+│       │   ├── rag_service.py       # Busca de laudos similares e referências
+│       │   └── pdf_ingestion.py     # Ingestão de livros/PDFs de referência
 │       ├── ml/                   # Módulo de IA/Machine Learning
 │       │   ├── edf_reader.py     # Leitura de arquivos .EDF
 │       │   ├── preprocessing.py  # Filtros e processamento de sinal
@@ -169,6 +174,16 @@ Todas as integrações são configuráveis via `.env`:
 |---|---|---|
 | `CORS_ORIGINS` | URLs | Origens permitidas (frontend) |
 
+### RAG — Base de Conhecimento
+
+| Variável | Opções | Descrição |
+|---|---|---|
+| `RAG_ENABLED` | `true`, `false` | Habilitar base de conhecimento |
+| `EMBEDDING_PROVIDER` | `none`, `ollama`, `openai` | Provedor de embeddings |
+| `EMBEDDING_MODEL` | `nomic-embed-text`, `text-embedding-3-small` | Modelo de embedding |
+| `EMBEDDING_API_KEY` | sua chave | Chave da API (OpenAI) |
+| `EMBEDDING_BASE_URL` | URL | URL do Ollama |
+
 ---
 
 ## 🐳 Com Docker (alternativa)
@@ -202,6 +217,10 @@ Acesse:
 | `POST` | `/api/exams/{id}/analyze` | Analisar exame com IA |
 | `POST` | `/api/exams/{id}/generate-report` | Gerar laudo |
 | `GET` | `/api/exams/{id}/report` | Ver laudo gerado |
+| `POST` | `/api/references/upload-pdf` | Upload de livro/referência médica |
+| `GET` | `/api/references/sources` | Listar fontes de referência |
+| `GET` | `/api/references/stats` | Estatísticas do RAG |
+| `DELETE` | `/api/references/sources/{nome}` | Remover uma fonte |
 | `GET` | `/api/health` | Status do sistema |
 
 Documentação interativa: **http://localhost:8000/docs**
@@ -232,12 +251,71 @@ DATABASE_URL=postgresql+asyncpg://eeg_user:eeg_pass@localhost:5432/eeg_laudos
 
 ---
 
-## 📌 Pendências para funcionar 100%
+## � Base de Conhecimento (RAG)
+
+O sistema possui uma base de conhecimento que **aprende e melhora continuamente**. Ele combina três fontes de informação para gerar laudos cada vez mais precisos:
+
+### Como funciona
+
+| Fonte | O que faz | Quando atua |
+|---|---|---|
+| **IA (LLM)** | Conhecimento médico geral e linguagem profissional | Sempre — é o motor de geração |
+| **Laudos aprovados** | Padrões reais do consultório e estilo do médico | Automático — cada laudo aprovado alimenta a base |
+| **Livros de referência** | Fundamentação científica e critérios diagnósticos | Manual — upload de PDFs pelo médico |
+
+### Ciclo de melhoria contínua
+
+1. O médico **aprova um laudo** → o sistema armazena como referência
+2. No próximo exame similar → o sistema **busca laudos aprovados com padrão parecido**
+3. O LLM recebe esses exemplos como contexto → gera um laudo **mais alinhado com a prática do médico**
+4. Com o tempo, os laudos ficam mais consistentes e requerem menos edições
+
+### Adicionando livros de referência
+
+O sistema aceita PDFs de livros de medicina/neurologia (até 1000+ páginas). Os trechos relevantes são automaticamente recuperados durante a geração do laudo.
+
+**Via API (Swagger):** `POST /api/references/upload-pdf`
+
+```bash
+# Via linha de comando:
+curl -X POST http://localhost:8000/api/references/upload-pdf \
+  -H "Authorization: Bearer SEU_TOKEN" \
+  -F "file=@/caminho/do/livro.pdf" \
+  -F "source_name=Niedermeyer EEG"
+```
+
+Os PDFs são salvos em `data/uploads/references/` e o texto é indexado automaticamente.
+
+### Configuração do RAG
+
+Para ativar com Ollama (gratuito, local):
+```env
+RAG_ENABLED=true
+EMBEDDING_PROVIDER=ollama
+EMBEDDING_MODEL=nomic-embed-text
+EMBEDDING_BASE_URL=http://localhost:11434
+```
+
+Para ativar com OpenAI (pago, ~R$ 0,10/1M tokens):
+```env
+RAG_ENABLED=true
+EMBEDDING_PROVIDER=openai
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_API_KEY=sk-...
+```
+
+> **Nota:** Com `EMBEDDING_PROVIDER=none`, o RAG está habilitado estruturalmente mas não processa embeddings. O sistema funciona normalmente sem impacto.
+
+---
+
+## �📌 Pendências para funcionar 100%
 
 | Item | Status | O que fazer |
 |---|---|---|
 | Arquivo .EDF de exemplo | ⏳ Pendente | Enviar um arquivo .EDF do aparelho de EEG |
 | API Key Anthropic | ⏳ Pendente | Criar conta em console.anthropic.com |
+| Livro de referência (PDF) | ⏳ Pendente | Upload via API quando disponível |
+| Provedor de embeddings | ⏳ Pendente | Configurar Ollama ou OpenAI para ativar RAG |
 | Node.js | Verificar | `node --version` (precisa 18+) |
 
 Sem o arquivo .EDF, o upload funciona mas a análise não roda.
