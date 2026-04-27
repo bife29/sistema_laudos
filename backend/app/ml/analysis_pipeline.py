@@ -78,10 +78,9 @@ def run_full_analysis(file_path: str, patient_age_years: int = 30) -> dict:
     """
     # 1. Ler arquivo
     result = read_edf(file_path)
-    raw = result["raw"]
     metadata = result["metadata"]
 
-    data = raw.get_data()
+    data = result["data"]
     sfreq = metadata["sampling_rate"]
     channel_names = metadata["channel_names"]
 
