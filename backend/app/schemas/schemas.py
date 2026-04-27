@@ -150,3 +150,20 @@ class HealthResponse(BaseModel):
     database: str
     llm_provider: str
     storage_provider: str
+    rag_status: str | None = None
+
+
+# ── RAG / Referências ────────────────────────────────────────
+
+class ReferenceSourceResponse(BaseModel):
+    source_name: str
+    chunk_count: int
+    page_range: str | None = None
+
+
+class ReferenceStatsResponse(BaseModel):
+    rag_enabled: bool
+    embedding_provider: str
+    total_reference_chunks: int
+    total_report_embeddings: int
+    total_sources: int

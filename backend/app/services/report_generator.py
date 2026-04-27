@@ -18,6 +18,7 @@ def build_report_prompt(
     indication: str,
     duration_minutes: float,
     analysis_data: dict,
+    rag_context: str | None = None,
 ) -> str:
     """Monta o prompt para geração do laudo."""
 
@@ -29,7 +30,7 @@ def build_report_prompt(
     patterns = analysis_data.get("detected_patterns", {})
     pattern_list = ", ".join(patterns.keys()) if patterns else "Nenhum detectado"
 
-    return f"""Escreva um laudo de eletroencefalograma completo com a seguinte estrutura:
+    prompt = f"""Escreva um laudo de eletroencefalograma completo com a seguinte estrutura:
 
 DADOS DO PACIENTE:
 - Nome: {patient_name}
@@ -46,7 +47,16 @@ ANÁLISE COMPUTADORIZADA:
 - Ritmo de base: {base_rhythm} Hz nas regiões posteriores
 - Assimetria: {"Sim — " + asymmetry_desc if has_asymmetry else "Não detectada"}
 - Paroxismos detectados: {spike_count} eventos
-- Padrões anormais: {pattern_list}
+- Padrões anormais: {pattern_list}"""
+
+    # Adicionar contexto RAG se disponível
+    if rag_context:
+        prompt += f"""
+
+BASE DE CONHECIMENTO (use como referência, NÃO copie literalmente):
+{rag_context}"""
+
+    prompt += """
 
 ESTRUTURA DO LAUDO:
 1. IDENTIFICAÇÃO
@@ -59,7 +69,10 @@ REGRAS:
 - Use terminologia médica técnica
 - Seja objetivo e preciso
 - NÃO invente dados não fornecidos
+- Use as referências médicas e laudos similares como guia de estilo e fundamentação
 - Indique EEG NORMAL ou EEG ANORMAL na conclusão"""
+
+    return prompt
 
 
 async def generate_report(
@@ -68,6 +81,7 @@ async def generate_report(
     indication: str,
     duration_minutes: float,
     analysis_data: dict,
+    rag_context: str | None = None,
 ) -> str:
     """Gera o texto do laudo via LLM."""
     llm = get_llm()
@@ -77,5 +91,6 @@ async def generate_report(
         indication=indication,
         duration_minutes=duration_minutes,
         analysis_data=analysis_data,
+        rag_context=rag_context,
     )
     return await llm.generate(prompt=prompt, system_prompt=SYSTEM_PROMPT)

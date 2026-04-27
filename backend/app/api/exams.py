@@ -16,6 +16,7 @@ from backend.app.models.models import Exam, Patient, Analysis, Report, ExamStatu
 from backend.app.schemas.schemas import ExamResponse, UploadResponse, AnalysisResponse, ReportResponse, ReportUpdateText
 from backend.app.services.storage import get_storage
 from backend.app.services.report_generator import generate_report
+from backend.app.services.rag_service import build_rag_context, store_report_embedding
 
 router = APIRouter(prefix="/api/exams", tags=["Exames"])
 settings = get_settings()
@@ -160,12 +161,22 @@ async def generate_exam_report(
         "detected_patterns": analysis.detected_patterns or {},
     }
 
+    # Construir contexto RAG (laudos similares + referências médicas)
+    analysis_summary = (
+        f"EEG {analysis_dict['classification']}, "
+        f"ritmo de base {analysis_dict['base_rhythm_hz']} Hz, "
+        f"assimetria: {'sim' if analysis_dict['has_asymmetry'] else 'não'}, "
+        f"spikes: {analysis_dict['spike_count']}"
+    )
+    rag_context = await build_rag_context(db, analysis_summary)
+
     report_text = await generate_report(
         patient_name=patient.name,
         patient_age=age_str,
         indication=exam.indication or "Não informada",
         duration_minutes=(exam.duration_seconds or 0) / 60,
         analysis_data=analysis_dict,
+        rag_context=rag_context,
     )
 
     # Salvar relatório
@@ -255,4 +266,15 @@ async def approve_exam_report(
     report.approved_at = datetime.now()
     await db.commit()
     await db.refresh(report)
+
+    # Armazenar embedding do laudo aprovado para RAG (aprendizado contínuo)
+    # Roda em background — se falhar, não afeta a aprovação
+    await store_report_embedding(
+        db=db,
+        report_id=report.id,
+        exam_id=exam_id,
+        text=report.final_text or report.generated_text or "",
+        classification=None,  # Será preenchido se tiver análise
+    )
+
     return report

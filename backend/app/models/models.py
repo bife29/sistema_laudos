@@ -6,7 +6,7 @@ from enum import Enum as PyEnum
 
 from sqlalchemy import (
     String, Text, Float, Integer, Boolean, DateTime,
-    ForeignKey, Enum, JSON,
+    ForeignKey, Enum, JSON, LargeBinary,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -147,6 +147,37 @@ class Report(Base):
 
     exam: Mapped["Exam"] = relationship(back_populates="report")
     approved_by_user: Mapped["User | None"] = relationship(back_populates="reports")
+
+
+# ── RAG: Report Embeddings ───────────────────────────────────
+
+class ReportEmbedding(Base):
+    __tablename__ = "report_embeddings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    report_id: Mapped[str] = mapped_column(ForeignKey("reports.id"), unique=True)
+    exam_id: Mapped[str] = mapped_column(ForeignKey("exams.id"))
+    text_summary: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[bytes] = mapped_column(LargeBinary)
+    classification: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# ── RAG: Reference Chunks (livros / documentos) ─────────────
+
+class ReferenceChunk(Base):
+    __tablename__ = "reference_chunks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source_name: Mapped[str] = mapped_column(String(300), index=True)
+    source_file: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    chapter: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    page_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    page_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    chunk_index: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 # ── Audit Log ────────────────────────────────────────────────

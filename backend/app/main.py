@@ -73,10 +73,12 @@ app.add_middleware(
 from backend.app.api.auth import router as auth_router
 from backend.app.api.patients import router as patients_router
 from backend.app.api.exams import router as exams_router
+from backend.app.api.references import router as references_router
 
 app.include_router(auth_router)
 app.include_router(patients_router)
 app.include_router(exams_router)
+app.include_router(references_router)
 
 
 @app.get("/api/health", response_model=HealthResponse, tags=["Sistema"])
@@ -96,4 +98,5 @@ async def health_check():
         database=db_type,
         llm_provider=llm_status,
         storage_provider=settings.storage_provider,
+        rag_status=f"{'habilitado' if settings.rag_enabled else 'desabilitado'} ({settings.embedding_provider})",
     )

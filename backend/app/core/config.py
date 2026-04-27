@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.3
     llm_base_url: str = ""  # Para Ollama
 
+    # ── RAG / Embeddings ─────────────────────────────────────
+    rag_enabled: bool = True
+    embedding_provider: str = "none"  # none | openai | ollama
+    embedding_model: str = ""
+    embedding_api_key: str = ""
+    embedding_base_url: str = ""
+
     # ── Redis ────────────────────────────────────────────────
     redis_url: str = ""
 
