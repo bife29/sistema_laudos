@@ -2,7 +2,7 @@ services:
   - type: web
     name: eeg-laudos-api
     runtime: python
-    buildCommand: pip install -e "." && pip install asyncpg
+    buildCommand: pip install --no-cache-dir -e "." && pip install asyncpg
     startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
