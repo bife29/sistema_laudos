@@ -25,7 +25,32 @@ async def lifespan(app: FastAPI):
     # Criar tabelas do banco
     await init_db()
 
+    # Criar usuário admin padrão se não existir
+    await create_default_admin()
+
     yield
+
+
+async def create_default_admin():
+    """Cria o usuário admin padrão se o banco estiver vazio."""
+    from sqlalchemy import select
+    from backend.app.core.database import async_session
+    from backend.app.core.security import hash_password
+    from backend.app.models.models import User, UserRole
+
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.email == "admin@eeg.com"))
+        if result.scalar_one_or_none() is None:
+            admin = User(
+                name="Dr. Admin",
+                email="admin@eeg.com",
+                hashed_password=hash_password("admin123"),
+                role=UserRole.ADMIN,
+                is_active=True,
+            )
+            session.add(admin)
+            await session.commit()
+            print("✅ Usuário admin criado (admin@eeg.com / admin123)")
 
 
 app = FastAPI(
@@ -58,12 +83,17 @@ app.include_router(exams_router)
 async def health_check():
     """Verifica o status do sistema."""
     db_type = "sqlite" if settings.is_sqlite else "postgresql"
-    llm_configured = bool(settings.llm_api_key and settings.llm_api_key != "COLOQUE-SUA-API-KEY-AQUI")
+    if settings.llm_provider == "ollama":
+        llm_status = "ollama (configurado)"
+    elif settings.llm_api_key and settings.llm_api_key != "COLOQUE-SUA-API-KEY-AQUI":
+        llm_status = f"{settings.llm_provider} (configurado)"
+    else:
+        llm_status = f"{settings.llm_provider} (NÃO configurado)"
 
     return HealthResponse(
         status="ok",
         version=settings.app_version,
         database=db_type,
-        llm_provider=f"{settings.llm_provider} ({'configurado' if llm_configured else 'NÃO configurado'})",
+        llm_provider=llm_status,
         storage_provider=settings.storage_provider,
     )
