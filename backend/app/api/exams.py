@@ -13,7 +13,7 @@ from backend.app.core.config import get_settings
 from backend.app.core.database import get_db
 from backend.app.core.security import get_current_user_id
 from backend.app.models.models import Exam, Patient, Analysis, Report, ExamStatus, ReportStatus
-from backend.app.schemas.schemas import ExamResponse, UploadResponse, AnalysisResponse, ReportResponse
+from backend.app.schemas.schemas import ExamResponse, UploadResponse, AnalysisResponse, ReportResponse, ReportUpdateText
 from backend.app.services.storage import get_storage
 from backend.app.services.report_generator import generate_report
 
@@ -217,4 +217,42 @@ async def get_exam_report(
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="Laudo não encontrado. Gere primeiro com /generate-report")
+    return report
+
+
+@router.put("/{exam_id}/report", response_model=ReportResponse)
+async def update_exam_report(
+    exam_id: str,
+    data: ReportUpdateText,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Atualizar texto do laudo (edição pelo médico)."""
+    result = await db.execute(select(Report).where(Report.exam_id == exam_id))
+    report = result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="Laudo não encontrado")
+    report.final_text = data.final_text
+    report.status = ReportStatus.REVIEW
+    await db.commit()
+    await db.refresh(report)
+    return report
+
+
+@router.post("/{exam_id}/report/approve", response_model=ReportResponse)
+async def approve_exam_report(
+    exam_id: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Aprovar laudo (assinatura do médico)."""
+    result = await db.execute(select(Report).where(Report.exam_id == exam_id))
+    report = result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="Laudo não encontrado")
+    report.status = ReportStatus.APPROVED
+    report.approved_by_id = user_id
+    report.approved_at = datetime.now()
+    await db.commit()
+    await db.refresh(report)
     return report

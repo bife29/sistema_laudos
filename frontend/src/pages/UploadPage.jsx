@@ -1,11 +1,19 @@
 import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
+
+const ERROR_MESSAGES = {
+  'Erro no upload': 'Não foi possível enviar o arquivo. Verifique sua conexão e tente novamente.',
+  'Erro na análise': 'A análise do exame falhou. O arquivo pode estar corrompido ou em formato incompatível.',
+  'Erro ao gerar laudo': 'Não foi possível gerar o laudo. Tente novamente em alguns instantes.',
+}
 
 export default function UploadPage() {
   const [file, setFile] = useState(null)
   const [patientName, setPatientName] = useState('')
   const [indication, setIndication] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [step, setStep] = useState('upload') // upload | analyzing | done
   const [uploading, setUploading] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -14,6 +22,12 @@ export default function UploadPage() {
   const [report, setReport] = useState(null)
   const [error, setError] = useState('')
   const fileRef = useRef()
+  const navigate = useNavigate()
+
+  const friendlyError = (err, fallback) => {
+    const msg = err.response?.data?.detail || fallback
+    return ERROR_MESSAGES[msg] || msg
+  }
 
   const handleDrop = (e) => {
     e.preventDefault()
@@ -55,7 +69,7 @@ export default function UploadPage() {
       const uploadRes = await api.post('/exams/upload', formData)
       setExamResult(uploadRes.data)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erro no upload')
+      setError(friendlyError(err, 'Erro no upload'))
     } finally {
       setUploading(false)
     }
@@ -70,7 +84,7 @@ export default function UploadPage() {
       const res = await api.post(`/exams/${examResult.exam_id}/analyze`)
       setAnalysisResult(res.data)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erro na análise')
+      setError(friendlyError(err, 'Erro na análise'))
     } finally {
       setAnalyzing(false)
     }
@@ -85,10 +99,21 @@ export default function UploadPage() {
       const res = await api.post(`/exams/${examResult.exam_id}/generate-report`)
       setReport(res.data)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erro ao gerar laudo')
+      setError(friendlyError(err, 'Erro ao gerar laudo'))
     } finally {
       setGenerating(false)
     }
+  }
+
+  const handleNewConsult = () => {
+    setFile(null)
+    setPatientName('')
+    setIndication('')
+    setExamResult(null)
+    setAnalysisResult(null)
+    setReport(null)
+    setError('')
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   return (
@@ -152,7 +177,9 @@ export default function UploadPage() {
             onClick={handleUpload}
             disabled={uploading || !file || !patientName}
           >
-            {uploading ? '⏳ Enviando...' : '🚀 Enviar Exame'}
+            {uploading ? (
+              <><span className="spinner-inline" /> Enviando arquivo...</>
+            ) : '🚀 Enviar Exame'}
           </button>
         </div>
       </div>
@@ -169,7 +196,9 @@ export default function UploadPage() {
             onClick={handleAnalyze}
             disabled={analyzing || analysisResult}
           >
-            {analyzing ? '⏳ Analisando com IA...' : '🧠 Analisar com IA'}
+            {analyzing ? (
+              <><span className="spinner-inline" /> Analisando com IA...</>
+            ) : analysisResult ? '✅ Análise Concluída' : '🧠 Analisar com IA'}
           </button>
         </div>
       )}
@@ -202,7 +231,9 @@ export default function UploadPage() {
               onClick={handleGenerateReport}
               disabled={generating || report}
             >
-              {generating ? '⏳ Gerando laudo...' : '📝 Gerar Laudo'}
+              {generating ? (
+                <><span className="spinner-inline" /> Gerando laudo...</>
+              ) : report ? '✅ Laudo Gerado' : '📝 Gerar Laudo'}
             </button>
           </div>
         </div>
@@ -224,6 +255,14 @@ export default function UploadPage() {
           <p style={{ marginTop: 8, fontSize: '0.8rem', color: '#999' }}>
             Gerado por: {report.llm_provider} / {report.llm_model}
           </p>
+          <div className="report-actions">
+            <button className="btn" onClick={() => navigate(`/report/${examResult.exam_id}`)}>
+              📋 Ver / Editar Laudo Completo
+            </button>
+            <button className="btn btn-success" onClick={handleNewConsult}>
+              ➕ Nova Consulta
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -3,11 +3,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from backend.app.core.database import get_db
 from backend.app.core.security import get_current_user_id
-from backend.app.models.models import Patient
-from backend.app.schemas.schemas import PatientCreate, PatientUpdate, PatientResponse
+from backend.app.models.models import Patient, Exam
+from backend.app.schemas.schemas import PatientCreate, PatientUpdate, PatientResponse, ExamResponse
 
 router = APIRouter(prefix="/api/patients", tags=["Pacientes"])
 
@@ -65,3 +66,16 @@ async def update_patient(
     await db.commit()
     await db.refresh(patient)
     return patient
+
+
+@router.get("/{patient_id}/exams", response_model=list[ExamResponse])
+async def list_patient_exams(
+    patient_id: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Listar todos os exames de um paciente."""
+    result = await db.execute(
+        select(Exam).where(Exam.patient_id == patient_id).order_by(Exam.created_at.desc())
+    )
+    return result.scalars().all()
