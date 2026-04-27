@@ -2,21 +2,37 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from backend.app.core.config import get_settings
 
 settings = get_settings()
 
+# Neon free tier usa pooler externo (-pooler no hostname) e suspende após
+# inatividade. NullPool evita conexões stale no pool local do SQLAlchemy.
+_is_neon = "neon.tech" in settings.database_url
+
+if settings.is_sqlite:
+    _engine_kwargs = dict(
+        connect_args={"check_same_thread": False},
+    )
+elif _is_neon:
+    _engine_kwargs = dict(
+        connect_args={"ssl": True},
+        poolclass=NullPool,
+    )
+else:
+    _engine_kwargs = dict(
+        pool_pre_ping=True,
+        pool_recycle=300,
+        pool_size=5,
+        max_overflow=10,
+    )
+
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
-    # SQLite precisa de check_same_thread=False
-    connect_args={"check_same_thread": False} if settings.is_sqlite else {"ssl": True} if "neon.tech" in settings.database_url else {},
-    # Reconecta automaticamente se a conexão cair (Neon auto-suspend)
-    pool_pre_ping=True,
-    pool_recycle=300,
-    pool_size=5,
-    max_overflow=10,
+    **_engine_kwargs,
 )
 
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
