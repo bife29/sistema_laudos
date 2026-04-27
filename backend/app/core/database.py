@@ -11,7 +11,12 @@ engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
     # SQLite precisa de check_same_thread=False
-    connect_args={"check_same_thread": False} if settings.is_sqlite else {},
+    connect_args={"check_same_thread": False} if settings.is_sqlite else {"ssl": True} if "neon.tech" in settings.database_url else {},
+    # Reconecta automaticamente se a conexão cair (Neon auto-suspend)
+    pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=5,
+    max_overflow=10,
 )
 
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
