@@ -1,14 +1,19 @@
 """Leitor de arquivos EDF — extrai metadados e dados do sinal EEG."""
 
+# Máximo de segundos a carregar (limita uso de memória em hosts free)
+MAX_DURATION_SECONDS = 60
+
 
 def read_edf(file_path: str) -> dict:
     """
     Lê um arquivo .EDF e retorna metadados + dados brutos.
+    Carrega no máximo MAX_DURATION_SECONDS para limitar uso de RAM.
     Requer MNE-Python instalado.
     """
     import mne
 
-    raw = mne.io.read_raw_edf(file_path, preload=True, verbose=False)
+    # Primeiro lê sem carregar dados para pegar metadados
+    raw = mne.io.read_raw_edf(file_path, preload=False, verbose=False)
 
     metadata = {
         "n_channels": raw.info["nchan"],
@@ -17,6 +22,11 @@ def read_edf(file_path: str) -> dict:
         "channel_names": raw.ch_names,
         "patient_info": raw.info.get("subject_info", {}),
     }
+
+    # Carrega apenas os primeiros N segundos para economizar memória
+    tmax = min(MAX_DURATION_SECONDS, raw.times[-1])
+    raw.crop(tmin=0, tmax=tmax)
+    raw.load_data(verbose=False)
 
     return {"raw": raw, "metadata": metadata}
 
