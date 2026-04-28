@@ -2,14 +2,17 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e ".[prod]" 2>/dev/null || pip install --no-cache-dir . && pip install asyncpg
-
+# Copiar código-fonte e dependências
+COPY pyproject.toml setup.py ./
 COPY backend/ backend/
+
+# Instalar dependências
+RUN pip install --no-cache-dir ".[prod]" asyncpg
+
 COPY .env* ./
 
-# Diretório para uploads temporários
-RUN mkdir -p /app/data/uploads
+# Diretório para uploads e referências
+RUN mkdir -p /app/data/uploads /app/data/uploads/references
 
 EXPOSE 8000
 
