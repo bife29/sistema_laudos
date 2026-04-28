@@ -3,7 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Copiar código-fonte e dependências
-COPY pyproject.toml setup.py ./
+COPY pyproject.toml setup.py .env.example ./
 COPY backend/ backend/
 
 # Instalar dependências
