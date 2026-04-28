@@ -89,6 +89,13 @@ async def analyze_exam(
     if not await storage.exists(exam.file_path):
         raise HTTPException(status_code=400, detail="Arquivo EDF não encontrado no storage")
 
+    # Remover análise anterior (reanálise)
+    old_analysis = await db.execute(select(Analysis).where(Analysis.exam_id == exam_id))
+    old = old_analysis.scalar_one_or_none()
+    if old:
+        await db.delete(old)
+        await db.flush()
+
     # Executar análise
     exam.status = ExamStatus.PROCESSING
     await db.commit()
