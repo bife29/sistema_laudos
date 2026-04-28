@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [selectedPatient, setSelectedPatient] = useState(null)
   const [patientExams, setPatientExams] = useState([])
   const [loadingExams, setLoadingExams] = useState(false)
+  const [reanalyzingId, setReanalyzingId] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -196,16 +197,24 @@ export default function DashboardPage() {
                         {(exam.status === 'processing' || exam.status === 'error') && (
                           <button
                             className="btn btn-sm btn-outline"
+                            disabled={reanalyzingId === exam.id}
                             onClick={async () => {
+                              setReanalyzingId(exam.id)
                               try {
                                 await api.post(`/exams/${exam.id}/analyze`)
-                                loadData()
+                                await loadData()
                               } catch (err) {
                                 alert(err.response?.data?.detail || 'Erro ao reanalisar')
+                              } finally {
+                                setReanalyzingId(null)
                               }
                             }}
                           >
-                            🔄 Reanalisar
+                            {reanalyzingId === exam.id ? (
+                              <><span className="spinner-sm" /> Analisando...</>
+                            ) : (
+                              '🔄 Reanalisar'
+                            )}
                           </button>
                         )}
                         {exam.status === 'uploaded' && (
