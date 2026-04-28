@@ -29,7 +29,7 @@ dependencies = [
 
     # LLM providers
     "anthropic>=0.39.0",
-    # "openai>=1.50.0",            # Descomente se usar OpenAI
+    "openai>=1.50.0",
     # "httpx>=0.27.0",             # Para Ollama
 
     # EEG / ML
