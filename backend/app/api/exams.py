@@ -1,6 +1,7 @@
 """Rotas de exames — upload, análise e geração de laudo."""
 
 import uuid
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -80,16 +81,31 @@ async def analyze_exam(
     if not exam:
         raise HTTPException(status_code=404, detail="Exame não encontrado")
 
-    if not exam.file_path or not Path(exam.file_path).exists():
+    if not exam.file_path:
         raise HTTPException(status_code=400, detail="Arquivo EDF não encontrado")
+
+    # Carregar arquivo via storage provider (funciona com local e R2/S3)
+    storage = get_storage()
+    if not await storage.exists(exam.file_path):
+        raise HTTPException(status_code=400, detail="Arquivo EDF não encontrado no storage")
 
     # Executar análise
     exam.status = ExamStatus.PROCESSING
     await db.commit()
 
     try:
+        file_bytes = await storage.load(exam.file_path)
+
+        # Salvar em temp para análise (edfio precisa de arquivo em disco)
+        with tempfile.NamedTemporaryFile(suffix=".edf", delete=False) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = tmp.name
+
         from backend.app.ml.analysis_pipeline import run_full_analysis
-        analysis_data = run_full_analysis(exam.file_path, patient_age_years)
+        analysis_data = run_full_analysis(tmp_path, patient_age_years)
+
+        # Limpar arquivo temporário
+        Path(tmp_path).unlink(missing_ok=True)
     except Exception as e:
         exam.status = ExamStatus.ERROR
         await db.commit()

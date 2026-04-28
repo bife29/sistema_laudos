@@ -18,8 +18,9 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Inicialização e encerramento da aplicação."""
-    # Criar diretórios necessários
-    Path(settings.storage_local_path).mkdir(parents=True, exist_ok=True)
+    # Criar diretórios locais apenas se não usar cloud storage
+    if settings.storage_provider == "local":
+        Path(settings.storage_local_path).mkdir(parents=True, exist_ok=True)
     Path("data").mkdir(parents=True, exist_ok=True)
 
     # Criar tabelas do banco
