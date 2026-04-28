@@ -15,3 +15,4 @@ docs/pages/
 /package-lock.json
 check_prod.py
 clean_prod.py
+render_config.py

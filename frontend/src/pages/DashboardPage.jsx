@@ -185,7 +185,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="exam-item-actions">
-                        {exam.status === 'analyzed' && (
+                        {(exam.status === 'analyzed' || exam.status === 'processing') && (
                           <button
                             className="btn btn-sm"
                             onClick={() => navigate(`/report/${exam.id}`)}
@@ -193,11 +193,23 @@ export default function DashboardPage() {
                             📝 Ver Laudo
                           </button>
                         )}
+                        {(exam.status === 'processing' || exam.status === 'error') && (
+                          <button
+                            className="btn btn-sm btn-outline"
+                            onClick={async () => {
+                              try {
+                                await api.post(`/exams/${exam.id}/analyze`)
+                                loadData()
+                              } catch (err) {
+                                alert(err.response?.data?.detail || 'Erro ao reanalisar')
+                              }
+                            }}
+                          >
+                            🔄 Reanalisar
+                          </button>
+                        )}
                         {exam.status === 'uploaded' && (
                           <span className="text-muted">Aguardando análise</span>
-                        )}
-                        {exam.status === 'error' && (
-                          <span className="text-danger">Falha na análise</span>
                         )}
                       </div>
                     </div>

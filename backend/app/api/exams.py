@@ -218,7 +218,22 @@ async def list_exams(
     user_id: str = Depends(get_current_user_id),
 ):
     result = await db.execute(select(Exam).order_by(Exam.created_at.desc()))
-    return result.scalars().all()
+    exams = result.scalars().all()
+
+    # Auto-corrigir exames presos em "processing" que já têm análise
+    fixed = False
+    for exam in exams:
+        if exam.status == ExamStatus.PROCESSING:
+            analysis_result = await db.execute(
+                select(Analysis).where(Analysis.exam_id == exam.id)
+            )
+            if analysis_result.scalar_one_or_none():
+                exam.status = ExamStatus.ANALYZED
+                fixed = True
+    if fixed:
+        await db.commit()
+
+    return exams
 
 
 @router.get("/{exam_id}", response_model=ExamResponse)
