@@ -2,6 +2,8 @@
 
 Sistema web que utiliza Inteligência Artificial para auxiliar médicos na elaboração de laudos de Eletroencefalograma (EEG).
 
+> 📐 **[Documentação Arquitetural (C4 Model)](README_C4.md)** — Diagramas de contexto, containers, componentes, fluxos e deploy.
+
 ---
 
 ## 📋 O que o sistema faz
