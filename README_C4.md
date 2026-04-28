@@ -1,322 +1,375 @@
-# 🧠 Sistema de Laudos EEG com IA — Documentação Arquitetural (C4 Model)
+# 🧠 Sistema de Laudos EEG com IA
 
-> Documentação baseada no [C4 Model](https://c4model.com) — uma abordagem de diagramação de arquitetura de software em 4 níveis de abstração.
+### Geração automatizada de laudos de Eletroencefalograma com Inteligência Artificial
 
----
+<br/>
 
-## 📐 Nível 1 — Contexto do Sistema
+> **Projeto full-stack** que combina processamento de sinais biomédicos, IA generativa (LLM) e RAG (Retrieval-Augmented Generation) para automatizar a elaboração de laudos de EEG — com aprendizado contínuo a partir da prática do médico.
 
-Visão de alto nível: quem usa o sistema e com quais serviços externos ele se comunica.
+<br/>
 
-```mermaid
-C4Context
-    title Sistema de Laudos EEG - Contexto do Sistema (Nível 1)
-
-    Person(medico, "Médico Neurologista", "Realiza upload de EEG, revisa e aprova laudos gerados por IA")
-
-    System(sistema, "Sistema de Laudos EEG", "Plataforma web que analisa exames EEG com IA e gera laudos médicos automatizados")
-
-    System_Ext(openai, "OpenAI API", "GPT-4o-mini para geração de laudos + text-embedding-3-small para RAG")
-    System_Ext(neon, "Neon PostgreSQL", "Banco de dados relacional na nuvem (serverless)")
-    System_Ext(r2, "Cloudflare R2", "Armazenamento de arquivos EDF (S3-compatível)")
-    System_Ext(vercel, "Vercel", "Hospedagem do frontend React")
-    System_Ext(render, "Render", "Hospedagem do backend FastAPI (Docker)")
-
-    Rel(medico, sistema, "Acessa via navegador", "HTTPS")
-    Rel(sistema, openai, "Gera laudos e embeddings", "HTTPS/API")
-    Rel(sistema, neon, "Persiste dados", "PostgreSQL/SSL")
-    Rel(sistema, r2, "Armazena arquivos EDF", "S3 API/HTTPS")
-
-    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
-```
-
-**Decisões-chave:**
-| Decisão | Motivo |
+| | |
 |---|---|
-| OpenAI (única API key) | Serve tanto LLM (gpt-4o-mini) quanto Embeddings (text-embedding-3-small) |
-| Neon PostgreSQL | Serverless, free tier generoso, compatível com asyncpg |
-| Cloudflare R2 | 10 GB grátis, S3-compatível, sem egress fees |
-| Render (Docker) | Deploy automático via GitHub, free tier para testes |
-| Vercel | Deploy estático otimizado para React SPA |
+| **Backend** | Python 3.12 · FastAPI · SQLAlchemy 2.0 · asyncpg |
+| **Frontend** | React 18 · Vite 5 · Axios |
+| **IA** | OpenAI GPT-4o-mini · RAG com Embeddings |
+| **Infra** | Render (Docker) · Vercel · Neon PostgreSQL · Cloudflare R2 |
+| **Padrões** | Strategy Pattern · Async/Await · JWT Auth · S3-compatible Storage |
 
 ---
 
-## 📦 Nível 2 — Diagrama de Containers
+## 🎯 Como funciona — Visão para não-técnicos
 
-Zoom no sistema: quais são os principais containers (aplicações/serviços) e como se comunicam.
+O fluxo completo em 5 passos simples:
 
 ```mermaid
-C4Container
-    title Sistema de Laudos EEG - Diagrama de Containers (Nível 2)
+flowchart TB
+    subgraph JORNADA [" "]
+        direction TB
+        
+        S1["📤 &nbsp; <b>Upload</b><br/>O médico envia o arquivo<br/>do exame de EEG (.EDF)"]
+        S2["🔬 &nbsp; <b>Análise Automática</b><br/>A IA lê os 19 canais do EEG<br/>e detecta padrões anormais"]
+        S3["📝 &nbsp; <b>Laudo Gerado por IA</b><br/>O sistema gera o laudo completo<br/>em linguagem médica profissional"]
+        S4["✏️ &nbsp; <b>Revisão Médica</b><br/>O médico revisa, edita se<br/>necessário e aprova o laudo"]
+        S5["🧠 &nbsp; <b>IA Aprende</b><br/>O laudo aprovado alimenta a base<br/>de conhecimento — laudos futuros<br/>ficam cada vez melhores"]
 
-    Person(medico, "Médico Neurologista", "Revisa e aprova laudos EEG")
+        S1 --> S2 --> S3 --> S4 --> S5
+        S5 -.->|"melhoria contínua"| S3
+    end
 
-    Container_Boundary(sistema, "Sistema de Laudos EEG") {
-        Container(spa, "Frontend SPA", "React 18, Vite 5", "Interface web para upload, análise e revisão de laudos")
-        Container(api, "Backend API", "FastAPI, Python 3.12", "API REST: autenticação, análise EEG, geração de laudos, RAG")
-        Container(ml, "Módulo ML/EEG", "edfio, NumPy, SciPy", "Leitura de EDF, processamento de sinais, detecção de padrões")
-        Container(rag, "Módulo RAG", "OpenAI Embeddings", "Base de conhecimento: laudos aprovados + livros de referência")
-    }
-
-    System_Ext(openai, "OpenAI API", "LLM + Embeddings")
-    System_Ext(neon, "Neon PostgreSQL", "Banco de dados")
-    System_Ext(r2, "Cloudflare R2", "Storage de arquivos")
-
-    Rel(medico, spa, "Acessa", "HTTPS")
-    Rel(spa, api, "Requisições", "REST/JSON")
-    Rel(api, ml, "Executa análise EEG")
-    Rel(api, rag, "Busca contexto similar")
-    Rel(api, openai, "Gera laudo / embeddings", "HTTPS")
-    Rel(api, neon, "CRUD", "asyncpg/SSL")
-    Rel(api, r2, "Upload/Download EDF", "boto3/S3")
-
-    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
+    style S1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#0d47a1
+    style S2 fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
+    style S3 fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#1b5e20
+    style S4 fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#e65100
+    style S5 fill:#fce4ec,stroke:#c62828,stroke-width:2px,color:#b71c1c
+    style JORNADA fill:transparent,stroke:none
 ```
 
-**Tecnologias por container:**
-| Container | Stack | Hospedagem |
-|---|---|---|
-| Frontend SPA | React 18 + Vite 5 + Axios | Vercel |
-| Backend API | FastAPI + SQLAlchemy 2.0 + Pydantic | Render (Docker) |
-| Módulo ML/EEG | edfio + NumPy + SciPy | Embarcado no backend |
-| Módulo RAG | OpenAI Embeddings + Cosine Similarity | Embarcado no backend |
+> **Diferencial:** Cada laudo aprovado pelo médico é armazenado como referência. Quanto mais o sistema é usado, mais os laudos se alinham com o estilo e padrão do profissional.
 
 ---
 
-## 🔧 Nível 3 — Componentes do Backend
+## ☁️ Arquitetura Cloud — Serviços e Integrações
 
-Zoom no container "Backend API": cada módulo e suas responsabilidades.
+Visão geral de todos os serviços e como se comunicam:
 
 ```mermaid
-C4Component
-    title Backend API - Diagrama de Componentes (Nível 3)
+flowchart TB
+    subgraph INFRA [" "]
+        direction TB
+        
+        USER(("👨‍⚕️<br/>Médico"))
+        
+        subgraph FRONT ["  🖥️  Frontend  "]
+            REACT["<b>React 18</b><br/>Interface moderna e responsiva"]
+        end
+        
+        subgraph BACK ["  ⚙️  Backend  "]
+            API["<b>FastAPI</b><br/>API de alta performance"]
+            ML["<b>Motor de Análise EEG</b><br/>edfio + NumPy + SciPy"]
+            RAG["<b>Base de Conhecimento</b><br/>RAG com embeddings"]
+        end
+        
+        subgraph CLOUD ["  ☁️  Cloud Services  "]
+            OPENAI["<b>OpenAI</b><br/>GPT-4o-mini + Embeddings"]
+            NEON[("<b>Neon</b><br/>PostgreSQL")]
+            R2[("<b>Cloudflare R2</b><br/>Object Storage")]
+        end
 
-    Container_Boundary(api, "Backend API — FastAPI") {
-
-        Component(auth, "Auth Controller", "api/auth.py", "Login, registro, JWT tokens")
-        Component(patients, "Patients Controller", "api/patients.py", "CRUD de pacientes")
-        Component(exams, "Exams Controller", "api/exams.py", "Upload EDF, análise, geração de laudo")
-        Component(refs, "References Controller", "api/references.py", "Upload de PDFs médicos para RAG")
-
-        Component(security, "Security", "core/security.py", "Hash de senhas, validação JWT")
-        Component(config, "Config", "core/config.py", "Variáveis de ambiente (.env)")
-
-        Component(llm, "LLM Provider", "services/llm_provider.py", "Abstração: OpenAI / Anthropic / Ollama")
-        Component(report, "Report Generator", "services/report_generator.py", "Monta prompt médico e chama LLM")
-        Component(storage, "Storage Provider", "services/storage.py", "Abstração: Local / R2 / S3")
-        Component(embed, "Embedding Service", "services/embedding_service.py", "Gera vetores: OpenAI / Ollama")
-        Component(ragsvc, "RAG Service", "services/rag_service.py", "Busca laudos similares e referências")
-        Component(ingest, "PDF Ingestion", "services/pdf_ingestion.py", "Extrai texto, chunka e indexa PDFs")
-
-        Component(pipeline, "Analysis Pipeline", "ml/analysis_pipeline.py", "Pipeline completo de análise EEG")
-        Component(edf, "EDF Reader", "ml/edf_reader.py", "Leitura de arquivos .EDF via edfio")
-        Component(preproc, "Preprocessing", "ml/preprocessing.py", "Filtros e processamento de sinais")
-    }
-
-    Rel(exams, storage, "Save/Load EDF")
-    Rel(exams, pipeline, "Executa análise")
-    Rel(exams, report, "Gera laudo")
-    Rel(exams, ragsvc, "Busca contexto RAG")
-    Rel(report, llm, "Chama LLM")
-    Rel(ragsvc, embed, "Gera embeddings")
-    Rel(refs, ingest, "Processa PDF")
-    Rel(ingest, embed, "Gera embeddings dos chunks")
-    Rel(pipeline, edf, "Lê .EDF")
-    Rel(pipeline, preproc, "Filtra sinais")
-    Rel(auth, security, "Valida credenciais")
-
-    UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="1")
+        USER -->|"HTTPS"| REACT
+        REACT -->|"REST API"| API
+        API --> ML
+        API --> RAG
+        API -->|"Gera laudos"| OPENAI
+        API -->|"Dados"| NEON
+        API -->|"Arquivos EDF"| R2
+        RAG -->|"Embeddings"| OPENAI
+    end
+    
+    style USER fill:#ffffff,stroke:#1976d2,stroke-width:3px,color:#0d47a1
+    style REACT fill:#61dafb,stroke:#0d47a1,stroke-width:2px,color:#000000
+    style API fill:#009688,stroke:#004d40,stroke-width:2px,color:#ffffff
+    style ML fill:#7e57c2,stroke:#4527a0,stroke-width:2px,color:#ffffff
+    style RAG fill:#ff7043,stroke:#bf360c,stroke-width:2px,color:#ffffff
+    style OPENAI fill:#10a37f,stroke:#0a6847,stroke-width:2px,color:#ffffff
+    style NEON fill:#3ecf8e,stroke:#1a7f5a,stroke-width:2px,color:#000000
+    style R2 fill:#f6821f,stroke:#a85400,stroke-width:2px,color:#ffffff
+    style FRONT fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    style BACK fill:#e8eaf6,stroke:#3949ab,stroke-width:2px
+    style CLOUD fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style INFRA fill:transparent,stroke:none
 ```
 
-**Padrão Strategy (plugável via .env):**
-| Abstração | Implementações | Variável |
+**Decisões de arquitetura:**
+
+| Serviço | Escolha | Por quê |
 |---|---|---|
-| LLM Provider | OpenAI, Anthropic, Ollama, Mock | `LLM_PROVIDER` |
-| Storage Provider | Local, Cloudflare R2, AWS S3, MinIO | `STORAGE_PROVIDER` |
-| Embedding Provider | OpenAI, Ollama, None | `EMBEDDING_PROVIDER` |
+| 🤖 IA | **OpenAI** (GPT-4o-mini + Embeddings) | Uma única API key serve LLM e embeddings |
+| 🗄️ Banco | **Neon** PostgreSQL | Serverless, free tier generoso, asyncpg |
+| 💾 Storage | **Cloudflare R2** | 10 GB grátis, S3-compatível, sem egress fees |
+| 🚀 Backend | **Render** (Docker) | Deploy automático via GitHub push |
+| 🖥️ Frontend | **Vercel** | Deploy estático otimizado para React |
 
 ---
 
-## 🔄 Fluxo Principal — Do Upload à Aprovação
+## 🔧 Componentes Internos do Backend
 
-O fluxo completo de um exame EEG, passando por todas as etapas do sistema.
+Cada módulo e suas dependências dentro da API:
 
 ```mermaid
 flowchart TD
-    subgraph UPLOAD ["1. Upload do Exame"]
-        A1[Médico seleciona .EDF] --> A2[Frontend envia arquivo]
-        A2 --> A3[API valida extensão .EDF]
-        A3 --> A4{Storage Provider}
-        A4 -->|Local| A5[Salva em disco]
-        A4 -->|R2/S3| A6[Upload via boto3]
-        A5 --> A7[Cria registro no PostgreSQL<br/>Status: UPLOADED]
-        A6 --> A7
+    subgraph COMP [" "]
+        direction TB
+        
+        subgraph CONTROLLERS ["  🎯  API Controllers  "]
+            AUTH["🔐 <b>Auth</b><br/>Login e JWT"]
+            PAT["👤 <b>Patients</b><br/>CRUD pacientes"]
+            EXAM["🧪 <b>Exams</b><br/>Upload + Análise + Laudo"]
+            REF["📚 <b>References</b><br/>Upload de livros"]
+        end
+
+        subgraph SERVICES ["  🔧  Services  "]
+            LLM["🤖 <b>LLM Provider</b><br/>OpenAI · Anthropic · Ollama"]
+            STORE["💾 <b>Storage</b><br/>R2 · S3 · Local"]
+            REPORT["📄 <b>Report Generator</b><br/>Prompt médico + LLM"]
+            EMBED["🧲 <b>Embeddings</b><br/>Vetorização de texto"]
+            RAGSVC["🔍 <b>RAG Service</b><br/>Busca semântica"]
+            INGEST["📖 <b>PDF Ingestion</b><br/>Chunking + indexação"]
+        end
+
+        subgraph ENGINE ["  🧠  ML Engine  "]
+            PIPE["⚡ <b>Analysis Pipeline</b><br/>Pipeline completo"]
+            EDF["📊 <b>EDF Reader</b><br/>Leitura 19 canais"]
+            PREP["🔉 <b>Preprocessing</b><br/>Filtros de sinal"]
+        end
+
+        EXAM --> STORE
+        EXAM --> PIPE
+        EXAM --> REPORT
+        EXAM --> RAGSVC
+        REPORT --> LLM
+        RAGSVC --> EMBED
+        REF --> INGEST
+        INGEST --> EMBED
+        PIPE --> EDF
+        PIPE --> PREP
     end
 
-    subgraph ANALISE ["2. Análise com IA"]
-        B1[Médico clica Analisar] --> B2[API carrega EDF do storage]
-        B2 --> B3[edfio lê canais do EEG]
-        B3 --> B4[Filtros: bandpass 0.5-50Hz<br/>notch 60Hz]
-        B4 --> B5[Extrai ritmo de base<br/>Detecta spikes<br/>Analisa assimetria]
-        B5 --> B6[Classifica: normal /<br/>anormal / indeterminado]
-        B6 --> B7[Salva Analysis no DB<br/>Status: ANALYZED]
-    end
-
-    subgraph LAUDO ["3. Geração de Laudo"]
-        C1[Médico clica Gerar Laudo] --> C2[Monta resumo da análise]
-        C2 --> C3{RAG habilitado?}
-        C3 -->|Sim| C4[Busca laudos similares<br/>+ referências médicas]
-        C3 -->|Não| C5[Sem contexto extra]
-        C4 --> C6[Monta prompt médico<br/>com contexto RAG]
-        C5 --> C6
-        C6 --> C7[Envia para LLM<br/>OpenAI / Anthropic / Ollama]
-        C7 --> C8[Salva Report no DB<br/>Status: DRAFT]
-    end
-
-    subgraph APROVACAO ["4. Revisão e Aprovação"]
-        D1[Médico revisa laudo] --> D2{Edita?}
-        D2 -->|Sim| D3[Atualiza texto<br/>Status: REVIEW]
-        D2 -->|Não| D4[Aprova laudo]
-        D3 --> D4
-        D4 --> D5[Status: APPROVED]
-        D5 --> D6{RAG habilitado?}
-        D6 -->|Sim| D7[Gera embedding do laudo<br/>Armazena para aprendizado]
-        D6 -->|Não| D8[Fim]
-        D7 --> D8
-    end
-
-    UPLOAD --> ANALISE --> LAUDO --> APROVACAO
-
-    style UPLOAD fill:#e1f5fe,stroke:#0288d1
-    style ANALISE fill:#f3e5f5,stroke:#7b1fa2
-    style LAUDO fill:#e8f5e9,stroke:#388e3c
-    style APROVACAO fill:#fff3e0,stroke:#f57c00
+    style AUTH fill:#5c6bc0,stroke:#283593,stroke-width:2px,color:#ffffff
+    style PAT fill:#5c6bc0,stroke:#283593,stroke-width:2px,color:#ffffff
+    style EXAM fill:#5c6bc0,stroke:#283593,stroke-width:2px,color:#ffffff
+    style REF fill:#5c6bc0,stroke:#283593,stroke-width:2px,color:#ffffff
+    style LLM fill:#10a37f,stroke:#0a6847,stroke-width:2px,color:#ffffff
+    style STORE fill:#f6821f,stroke:#a85400,stroke-width:2px,color:#ffffff
+    style REPORT fill:#26a69a,stroke:#00796b,stroke-width:2px,color:#ffffff
+    style EMBED fill:#ab47bc,stroke:#6a1b9a,stroke-width:2px,color:#ffffff
+    style RAGSVC fill:#ef5350,stroke:#b71c1c,stroke-width:2px,color:#ffffff
+    style INGEST fill:#ff7043,stroke:#d84315,stroke-width:2px,color:#ffffff
+    style PIPE fill:#7e57c2,stroke:#4527a0,stroke-width:2px,color:#ffffff
+    style EDF fill:#7e57c2,stroke:#4527a0,stroke-width:2px,color:#ffffff
+    style PREP fill:#7e57c2,stroke:#4527a0,stroke-width:2px,color:#ffffff
+    style CONTROLLERS fill:#e8eaf6,stroke:#3949ab,stroke-width:2px
+    style SERVICES fill:#e0f2f1,stroke:#00897b,stroke-width:2px
+    style ENGINE fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style COMP fill:transparent,stroke:none
 ```
 
 ---
 
-## 🧠 Fluxo RAG — Base de Conhecimento e Aprendizado Contínuo
+## ⚡ Pipeline Técnico — Fluxo Completo Detalhado
 
-Como o sistema aprende com laudos aprovados e referências médicas para gerar laudos cada vez melhores.
+Do upload do arquivo ao aprendizado contínuo, com todas as decisões do sistema:
 
 ```mermaid
 flowchart TD
-    subgraph RAG ["Ciclo RAG - Aprendizado Contínuo"]
+    subgraph FLOW [" "]
         direction TB
 
-        subgraph FONTES ["Fontes de Conhecimento"]
-            F1[📚 Livros de Referência<br/>PDFs médicos]
-            F2[✅ Laudos Aprovados<br/>Histórico do médico]
-        end
+        A["📤 <b>Upload .EDF</b>"]
+        B{"💾 Storage"}
+        B1["Local"]
+        B2["☁️ Cloudflare R2"]
+        C["📊 <b>Leitura do EEG</b><br/>19 canais · edfio"]
+        D["🔉 <b>Processamento</b><br/>Filtros bandpass 0.5-50Hz<br/>Filtro notch 60Hz"]
+        E["🧠 <b>Detecção de Padrões</b><br/>Ritmo de base · Spikes<br/>Assimetria · Artefatos"]
+        F["🏷️ <b>Classificação</b>"]
+        F1["✅ Normal"]
+        F2["⚠️ Anormal"]
+        F3["❓ Indeterminado"]
+        G{"🔍 RAG"}
+        G1["Busca laudos<br/>similares aprovados"]
+        G2["Busca referências<br/>de livros médicos"]
+        H["📝 <b>Prompt Médico</b><br/>Análise + Contexto RAG"]
+        I["🤖 <b>LLM gera laudo</b><br/>OpenAI GPT-4o-mini"]
+        J["✏️ <b>Médico revisa</b>"]
+        K["✅ <b>Laudo aprovado</b>"]
+        L["🧲 <b>Embedding armazenado</b><br/>Alimenta futuros laudos"]
 
-        subgraph INGESTAO ["Ingestão de PDFs"]
-            I1[Upload PDF] --> I2[pypdf extrai texto]
-            I2 --> I3[Divide em chunks<br/>800 palavras, overlap 100]
-            I3 --> I4[OpenAI gera embedding<br/>por chunk]
-            I4 --> I5[Salva em<br/>reference_chunks DB]
-        end
-
-        subgraph APROVACAO_EMB ["Aprovação → Embedding"]
-            A1[Médico aprova laudo] --> A2[Texto do laudo final]
-            A2 --> A3[OpenAI gera embedding]
-            A3 --> A4[Salva em<br/>report_embeddings DB]
-        end
-
-        subgraph BUSCA ["Busca na Geração do Laudo"]
-            B1[Nova análise EEG] --> B2[Gera embedding<br/>do resumo]
-            B2 --> B3[Similaridade de cosseno<br/>vs report_embeddings]
-            B2 --> B4[Similaridade de cosseno<br/>vs reference_chunks]
-            B3 --> B5[Top 3 laudos similares<br/>threshold > 0.30]
-            B4 --> B6[Top 3 referências<br/>threshold > 0.25]
-            B5 --> B7[Contexto RAG montado]
-            B6 --> B7
-            B7 --> B8[Enviado ao LLM<br/>junto com o prompt]
-        end
-
-        F1 --> INGESTAO
-        F2 --> APROVACAO_EMB
-        INGESTAO --> BUSCA
-        APROVACAO_EMB --> BUSCA
+        A --> B
+        B --> B1
+        B --> B2
+        B1 --> C
+        B2 --> C
+        C --> D --> E --> F
+        F --> F1
+        F --> F2
+        F --> F3
+        F1 --> G
+        F2 --> G
+        F3 --> G
+        G -->|"habilitado"| G1
+        G -->|"habilitado"| G2
+        G1 --> H
+        G2 --> H
+        G -->|"desabilitado"| H
+        H --> I --> J --> K --> L
+        L -.->|"melhoria contínua"| G1
     end
 
-    style FONTES fill:#e3f2fd,stroke:#1565c0
-    style INGESTAO fill:#fce4ec,stroke:#c62828
-    style APROVACAO_EMB fill:#e8f5e9,stroke:#2e7d32
-    style BUSCA fill:#fff8e1,stroke:#f9a825
+    style A fill:#1976d2,stroke:#0d47a1,stroke-width:2px,color:#ffffff
+    style C fill:#7e57c2,stroke:#4527a0,stroke-width:2px,color:#ffffff
+    style D fill:#7e57c2,stroke:#4527a0,stroke-width:2px,color:#ffffff
+    style E fill:#7e57c2,stroke:#4527a0,stroke-width:2px,color:#ffffff
+    style F fill:#546e7a,stroke:#263238,stroke-width:2px,color:#ffffff
+    style F1 fill:#66bb6a,stroke:#2e7d32,stroke-width:2px,color:#ffffff
+    style F2 fill:#ffa726,stroke:#e65100,stroke-width:2px,color:#ffffff
+    style F3 fill:#78909c,stroke:#37474f,stroke-width:2px,color:#ffffff
+    style G fill:#ef5350,stroke:#b71c1c,stroke-width:2px,color:#ffffff
+    style G1 fill:#ef9a9a,stroke:#c62828,stroke-width:2px,color:#000000
+    style G2 fill:#ef9a9a,stroke:#c62828,stroke-width:2px,color:#000000
+    style H fill:#26a69a,stroke:#00796b,stroke-width:2px,color:#ffffff
+    style I fill:#10a37f,stroke:#0a6847,stroke-width:2px,color:#ffffff
+    style J fill:#ff7043,stroke:#d84315,stroke-width:2px,color:#ffffff
+    style K fill:#66bb6a,stroke:#2e7d32,stroke-width:2px,color:#ffffff
+    style L fill:#ab47bc,stroke:#6a1b9a,stroke-width:2px,color:#ffffff
+    style B fill:#f6821f,stroke:#a85400,stroke-width:2px,color:#ffffff
+    style B1 fill:#ffe0b2,stroke:#e65100,stroke-width:1px,color:#000000
+    style B2 fill:#ffe0b2,stroke:#e65100,stroke-width:1px,color:#000000
+    style FLOW fill:transparent,stroke:none
 ```
-
-**Parâmetros RAG:**
-| Parâmetro | Valor | Descrição |
-|---|---|---|
-| Modelo de Embedding | `text-embedding-3-small` | 1536 dimensões |
-| Chunk size | 800 palavras | Com overlap de 100 palavras |
-| Top-K laudos | 3 | Similaridade mínima: 0.30 |
-| Top-K referências | 3 | Similaridade mínima: 0.25 |
-| Batch size (ingestão) | 20 chunks/batch | Controle de memória |
 
 ---
 
-## 🏗️ Arquitetura de Deploy
+## 🔌 Provedores Plugáveis — Strategy Pattern
 
-Infraestrutura em produção e comunicação entre serviços.
+Tudo parametrizável via variáveis de ambiente. Troque de provedor sem alterar uma linha de código:
 
 ```mermaid
 flowchart LR
-    subgraph DEPLOY ["Arquitetura de Deploy"]
-        direction TB
-
-        subgraph CLIENTE ["Cliente"]
-            Browser[🌐 Navegador]
+    subgraph PLUG [" "]
+        direction LR
+        
+        subgraph LLM_P ["  🤖  Geração de Laudos  "]
+            direction TB
+            LLM_H{"LLM_PROVIDER"}
+            L1["<b>OpenAI</b><br/>GPT-4o-mini"]
+            L2["<b>Anthropic</b><br/>Claude Sonnet"]
+            L3["<b>Ollama</b><br/>Llama 3 · Local"]
+            LLM_H --> L1
+            LLM_H --> L2
+            LLM_H --> L3
         end
 
-        subgraph VERCEL ["Vercel (Frontend)"]
-            SPA[React SPA<br/>sistemalaudos.vercel.app]
+        subgraph STORAGE_P ["  💾  Armazenamento  "]
+            direction TB
+            ST_H{"STORAGE_PROVIDER"}
+            S1["<b>Cloudflare R2</b><br/>10 GB free"]
+            S2["<b>AWS S3</b>"]
+            S3["<b>Local</b><br/>Disco"]
+            ST_H --> S1
+            ST_H --> S2
+            ST_H --> S3
         end
 
-        subgraph RENDER ["Render (Backend)"]
-            Docker[Docker Container<br/>Python 3.12]
-            FastAPI[FastAPI + Uvicorn<br/>eeg-laudos-api.onrender.com]
-            Docker --> FastAPI
+        subgraph EMB_P ["  🧲  Embeddings  "]
+            direction TB
+            EM_H{"EMBEDDING_PROVIDER"}
+            E1["<b>OpenAI</b><br/>text-embedding-3-small"]
+            E2["<b>Ollama</b><br/>nomic-embed-text"]
+            E3["<b>None</b><br/>RAG desabilitado"]
+            EM_H --> E1
+            EM_H --> E2
+            EM_H --> E3
         end
 
-        subgraph DADOS ["Serviços de Dados"]
-            Neon[(Neon PostgreSQL<br/>Serverless)]
-            R2[(Cloudflare R2<br/>Object Storage)]
+        subgraph DB_P ["  🗄️  Banco de Dados  "]
+            direction TB
+            DB_H{"DATABASE_URL"}
+            D1["<b>PostgreSQL</b><br/>Neon · Produção"]
+            D2["<b>SQLite</b><br/>Desenvolvimento"]
+            DB_H --> D1
+            DB_H --> D2
         end
-
-        subgraph IA ["Serviços de IA"]
-            OpenAI_LLM[OpenAI GPT-4o-mini<br/>Geração de laudos]
-            OpenAI_EMB[OpenAI Embeddings<br/>text-embedding-3-small]
-        end
-
-        Browser -->|HTTPS| SPA
-        SPA -->|REST/JSON| FastAPI
-        FastAPI -->|asyncpg/SSL| Neon
-        FastAPI -->|boto3/S3 API| R2
-        FastAPI -->|HTTPS| OpenAI_LLM
-        FastAPI -->|HTTPS| OpenAI_EMB
     end
 
-    style CLIENTE fill:#f5f5f5,stroke:#616161
-    style VERCEL fill:#000000,stroke:#ffffff,color:#ffffff
-    style RENDER fill:#46548a,stroke:#ffffff,color:#ffffff
-    style DADOS fill:#e8eaf6,stroke:#283593
-    style IA fill:#e8f5e9,stroke:#1b5e20
+    style LLM_H fill:#10a37f,stroke:#0a6847,stroke-width:2px,color:#ffffff
+    style L1 fill:#10a37f,stroke:#0a6847,stroke-width:1px,color:#ffffff
+    style L2 fill:#d97706,stroke:#92400e,stroke-width:1px,color:#ffffff
+    style L3 fill:#6366f1,stroke:#3730a3,stroke-width:1px,color:#ffffff
+    style ST_H fill:#f6821f,stroke:#a85400,stroke-width:2px,color:#ffffff
+    style S1 fill:#f6821f,stroke:#a85400,stroke-width:1px,color:#ffffff
+    style S2 fill:#ff9900,stroke:#cc7a00,stroke-width:1px,color:#000000
+    style S3 fill:#78909c,stroke:#37474f,stroke-width:1px,color:#ffffff
+    style EM_H fill:#ab47bc,stroke:#6a1b9a,stroke-width:2px,color:#ffffff
+    style E1 fill:#10a37f,stroke:#0a6847,stroke-width:1px,color:#ffffff
+    style E2 fill:#6366f1,stroke:#3730a3,stroke-width:1px,color:#ffffff
+    style E3 fill:#78909c,stroke:#37474f,stroke-width:1px,color:#ffffff
+    style DB_H fill:#3ecf8e,stroke:#1a7f5a,stroke-width:2px,color:#000000
+    style D1 fill:#3ecf8e,stroke:#1a7f5a,stroke-width:1px,color:#000000
+    style D2 fill:#78909c,stroke:#37474f,stroke-width:1px,color:#ffffff
+    style LLM_P fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    style STORAGE_P fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style EMB_P fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style DB_P fill:#e0f7fa,stroke:#00838f,stroke-width:2px
+    style PLUG fill:transparent,stroke:none
 ```
 
-**URLs de produção:**
-| Serviço | URL |
-|---|---|
-| Frontend | https://sistemalaudos.vercel.app |
-| Backend API | https://eeg-laudos-api.onrender.com |
-| API Docs (Swagger) | https://eeg-laudos-api.onrender.com/docs |
-| Health Check | https://eeg-laudos-api.onrender.com/api/health |
+---
+
+## 🚀 Deploy em Produção
+
+Pipeline de deploy e comunicação entre os serviços hospedados:
+
+```mermaid
+flowchart LR
+    subgraph DEPLOY [" "]
+        direction LR
+
+        Browser["🌐 <b>Navegador</b>"]
+        
+        VERCEL["<b>Vercel</b><br/>sistemalaudos.vercel.app"]
+        RENDER["<b>Render</b><br/>Docker + FastAPI"]
+        
+        NEON[("<b>Neon</b><br/>PostgreSQL")]
+        R2[("<b>Cloudflare R2</b><br/>10 GB free")]
+        OPENAI["<b>OpenAI</b><br/>GPT-4o-mini"]
+
+        Browser -->|"HTTPS"| VERCEL
+        VERCEL -->|"REST/JSON"| RENDER
+        RENDER -->|"asyncpg/SSL"| NEON
+        RENDER -->|"boto3/S3"| R2
+        RENDER -->|"HTTPS"| OPENAI
+    end
+
+    style Browser fill:#f5f5f5,stroke:#9e9e9e,stroke-width:2px,color:#212121
+    style VERCEL fill:#000000,stroke:#333333,stroke-width:2px,color:#ffffff
+    style RENDER fill:#46548a,stroke:#2a3255,stroke-width:2px,color:#ffffff
+    style NEON fill:#3ecf8e,stroke:#1a7f5a,stroke-width:2px,color:#000000
+    style R2 fill:#f6821f,stroke:#a85400,stroke-width:2px,color:#ffffff
+    style OPENAI fill:#10a37f,stroke:#0a6847,stroke-width:2px,color:#ffffff
+    style DEPLOY fill:transparent,stroke:none
+```
+
+| Serviço | URL | Status |
+|---|---|---|
+| Frontend | [sistemalaudos.vercel.app](https://sistemalaudos.vercel.app) | ✅ Live |
+| Backend API | [eeg-laudos-api.onrender.com](https://eeg-laudos-api.onrender.com) | ✅ Live |
+| Swagger Docs | [/docs](https://eeg-laudos-api.onrender.com/docs) | ✅ Live |
+| Health Check | [/api/health](https://eeg-laudos-api.onrender.com/api/health) | ✅ Live |
 
 ---
 
 ## 🗄️ Modelo de Dados
-
-Diagrama entidade-relacionamento com todas as tabelas do sistema.
 
 ```mermaid
 erDiagram
@@ -402,98 +455,55 @@ erDiagram
 
 ---
 
-## 📡 Mapa de Endpoints da API
+## 📡 API Endpoints
 
 ```mermaid
 flowchart LR
     subgraph AUTH ["🔐 Auth"]
-        POST_REG[POST /api/auth/register]
-        POST_LOG[POST /api/auth/login]
-        GET_ME[GET /api/auth/me]
+        POST_REG["POST /register"]
+        POST_LOG["POST /login"]
+        GET_ME["GET /me"]
     end
 
     subgraph PATIENTS ["👤 Patients"]
-        POST_PAT[POST /api/patients/]
-        GET_PATS[GET /api/patients/]
+        POST_PAT["POST /"]
+        GET_PATS["GET /"]
     end
 
     subgraph EXAMS ["🧪 Exams"]
-        POST_UP[POST /api/exams/upload]
-        POST_AN[POST /api/exams/:id/analyze]
-        POST_GEN[POST /api/exams/:id/generate-report]
-        GET_EX[GET /api/exams/:id]
-        GET_REP[GET /api/exams/:id/report]
-        PUT_REP[PUT /api/exams/:id/report]
-        POST_APR[POST /api/exams/:id/report/approve]
+        POST_UP["POST /upload"]
+        POST_AN["POST /:id/analyze"]
+        POST_GEN["POST /:id/generate-report"]
+        GET_REP["GET /:id/report"]
+        PUT_REP["PUT /:id/report"]
+        POST_APR["POST /:id/report/approve"]
     end
 
     subgraph REFS ["📚 References"]
-        POST_PDF[POST /api/references/upload-pdf]
-        GET_SRC[GET /api/references/sources]
-        GET_STAT[GET /api/references/stats]
-        DEL_SRC[DELETE /api/references/sources/:name]
+        POST_PDF["POST /upload-pdf"]
+        GET_SRC["GET /sources"]
+        GET_STAT["GET /stats"]
     end
 
-    subgraph SYS ["⚙️ Sistema"]
-        GET_HP[GET /api/health]
-    end
+    POST_UP -->|"arquivo .EDF"| POST_AN
+    POST_AN -->|"análise pronta"| POST_GEN
+    POST_GEN -->|"laudo gerado"| PUT_REP
+    PUT_REP -->|"texto revisado"| POST_APR
 
-    POST_UP -->|arquivo .EDF| POST_AN
-    POST_AN -->|análise pronta| POST_GEN
-    POST_GEN -->|laudo gerado| PUT_REP
-    PUT_REP -->|texto revisado| POST_APR
-
-    style AUTH fill:#e8eaf6,stroke:#3f51b5
-    style PATIENTS fill:#e0f2f1,stroke:#00897b
-    style EXAMS fill:#fff3e0,stroke:#ef6c00
-    style REFS fill:#fce4ec,stroke:#c62828
-    style SYS fill:#f5f5f5,stroke:#616161
+    style AUTH fill:#5c6bc0,stroke:#283593,stroke-width:2px,color:#ffffff
+    style PATIENTS fill:#26a69a,stroke:#00796b,stroke-width:2px,color:#ffffff
+    style EXAMS fill:#ff7043,stroke:#d84315,stroke-width:2px,color:#ffffff
+    style REFS fill:#ab47bc,stroke:#6a1b9a,stroke-width:2px,color:#ffffff
 ```
 
 ---
 
-## 🔑 Configurações Plugáveis (Strategy Pattern)
+<br/>
 
-O sistema é totalmente parametrizável via variáveis de ambiente:
+<div align="center">
 
-```mermaid
-flowchart TD
-    subgraph CONFIG ["Configuração via .env"]
-        direction LR
+**Feito com** FastAPI · React · OpenAI · PostgreSQL · Cloudflare R2
 
-        subgraph LLM_CFG ["LLM_PROVIDER"]
-            LLM_OAI[openai<br/>GPT-4o-mini]
-            LLM_ANT[anthropic<br/>Claude Sonnet]
-            LLM_OLL[ollama<br/>Llama 3 local]
-            LLM_MOCK[mock<br/>Texto exemplo]
-        end
+Diagramas renderizados com [Mermaid.js](https://mermaid.js.org/) — compatíveis com GitHub, GitLab e VS Code.
 
-        subgraph STORAGE_CFG ["STORAGE_PROVIDER"]
-            ST_LOCAL[local<br/>Disco /data/uploads]
-            ST_R2[r2<br/>Cloudflare R2]
-            ST_S3[s3<br/>AWS S3]
-            ST_MINIO[minio<br/>Self-hosted]
-        end
-
-        subgraph EMB_CFG ["EMBEDDING_PROVIDER"]
-            EMB_OAI[openai<br/>text-embedding-3-small]
-            EMB_OLL[ollama<br/>nomic-embed-text]
-            EMB_NONE[none<br/>RAG desabilitado]
-        end
-
-        subgraph DB_CFG ["DATABASE_URL"]
-            DB_SQLITE[sqlite<br/>Desenvolvimento]
-            DB_PG[postgresql<br/>Produção Neon]
-        end
-    end
-
-    style LLM_CFG fill:#e8f5e9,stroke:#2e7d32
-    style STORAGE_CFG fill:#e3f2fd,stroke:#1565c0
-    style EMB_CFG fill:#fff8e1,stroke:#f9a825
-    style DB_CFG fill:#f3e5f5,stroke:#7b1fa2
-```
-
----
-
-> **Referência:** Esta documentação segue o [C4 Model](https://c4model.com) de Simon Brown.
-> Diagramas renderizados com [Mermaid.js](https://mermaid.js.org/) — compatíveis com GitHub, GitLab e VS Code.
+</div>
