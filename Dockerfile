@@ -3,10 +3,10 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Copiar código-fonte e dependências
-COPY pyproject.toml setup.py .env.example ./
+COPY pyproject.toml .env.example ./
 COPY backend/ backend/
 
-# Instalar dependências
+# Instalar dependências (sem setup.py para evitar execução do script local)
 RUN pip install --no-cache-dir ".[prod]" asyncpg
 
 COPY .env* ./
