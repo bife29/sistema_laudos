@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 
@@ -15,7 +15,7 @@ export default function ReportPage() {
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState('')
   const [generating, setGenerating] = useState(false)
-  const printRef = useRef()
+
 
   useEffect(() => {
     loadReport()
@@ -95,71 +95,20 @@ export default function ReportPage() {
     }
   }
 
-  const handleExportPDF = () => {
-    const printContent = printRef.current
-    if (!printContent) return
-
-    const win = window.open('', '_blank')
-    win.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Laudo EEG - ${exam?.file_name || 'Exame'}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Times New Roman', Georgia, serif; padding: 40px; color: #222; line-height: 1.6; }
-          .pdf-header { text-align: center; border-bottom: 2px solid #1a237e; padding-bottom: 16px; margin-bottom: 24px; }
-          .pdf-header h1 { font-size: 20px; color: #1a237e; margin-bottom: 4px; }
-          .pdf-header p { font-size: 12px; color: #666; }
-          .pdf-section { margin-bottom: 20px; }
-          .pdf-section h3 { font-size: 14px; color: #1a237e; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-          .pdf-meta { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
-          .pdf-meta-item { font-size: 13px; }
-          .pdf-meta-item strong { color: #333; }
-          .pdf-body { font-size: 14px; white-space: pre-wrap; }
-          .pdf-disclaimer { margin-top: 24px; padding: 12px; border: 1px solid #e65100; background: #fff8f0; font-size: 11px; color: #e65100; }
-          .pdf-footer { margin-top: 40px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #ddd; padding-top: 12px; }
-          .pdf-signature { margin-top: 60px; text-align: center; }
-          .pdf-signature .line { border-top: 1px solid #333; width: 300px; margin: 0 auto 4px; }
-          .pdf-signature p { font-size: 13px; }
-          @media print { body { padding: 20px; } }
-        </style>
-      </head>
-      <body>
-        <div class="pdf-header">
-          <h1>LAUDO DE ELETROENCEFALOGRAMA</h1>
-          <p>Sistema de Laudos EEG com IA</p>
-        </div>
-        <div class="pdf-section">
-          <h3>Dados do Exame</h3>
-          <div class="pdf-meta">
-            <div class="pdf-meta-item"><strong>Arquivo:</strong> ${exam?.file_name || '-'}</div>
-            <div class="pdf-meta-item"><strong>Canais:</strong> ${exam?.n_channels || '-'}</div>
-            <div class="pdf-meta-item"><strong>Duração:</strong> ${exam?.duration_seconds ? (exam.duration_seconds / 60).toFixed(1) + ' min' : '-'}</div>
-            <div class="pdf-meta-item"><strong>Indicação:</strong> ${exam?.indication || 'Não informada'}</div>
-            <div class="pdf-meta-item"><strong>Data:</strong> ${exam?.created_at ? new Date(exam.created_at).toLocaleDateString('pt-BR') : '-'}</div>
-            <div class="pdf-meta-item"><strong>Status:</strong> ${report?.status?.toUpperCase() || '-'}</div>
-          </div>
-        </div>
-        <div class="pdf-section">
-          <h3>Laudo</h3>
-          <div class="pdf-body">${(report?.final_text || report?.generated_text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-        </div>
-        ${report?.disclaimer ? `<div class="pdf-disclaimer">${report.disclaimer}</div>` : ''}
-        <div class="pdf-signature">
-          <div class="line"></div>
-          <p>Médico Responsável</p>
-          <p style="font-size: 11px; color: #666;">CRM: ____________</p>
-        </div>
-        <div class="pdf-footer">
-          Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')} | 
-          Provedor: ${report?.llm_provider || '-'} / ${report?.llm_model || '-'}
-        </div>
-      </body>
-      </html>
-    `)
-    win.document.close()
-    setTimeout(() => { win.print() }, 500)
+  const handleExportPDF = async () => {
+    try {
+      const res = await api.get(`/exams/${examId}/report/pdf`, { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `laudo_${exam?.file_name?.replace('.edf', '') || examId}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Erro ao exportar PDF')
+    }
   }
 
   const formatDate = (dateStr) => {
@@ -232,7 +181,7 @@ export default function ReportPage() {
           </button>
         </div>
       ) : (
-        <div className="card" ref={printRef}>
+        <div className="card">
           <div className="card-header">
             <h2>📋 Laudo</h2>
             <div className="card-header-actions">

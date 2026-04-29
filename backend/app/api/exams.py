@@ -1,11 +1,13 @@
 """Rotas de exames — upload, análise e geração de laudo."""
 
+import io
 import uuid
 import tempfile
 from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -331,3 +333,104 @@ async def approve_exam_report(
     )
 
     return report
+
+
+@router.get("/{exam_id}/report/pdf")
+async def download_report_pdf(
+    exam_id: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Gerar e baixar laudo em formato PDF."""
+    from fpdf import FPDF
+
+    # Carregar exame + paciente
+    result = await db.execute(
+        select(Exam).options(selectinload(Exam.patient)).where(Exam.id == exam_id)
+    )
+    exam = result.scalar_one_or_none()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exame não encontrado")
+
+    # Carregar laudo
+    report_result = await db.execute(select(Report).where(Report.exam_id == exam_id))
+    report = report_result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="Laudo não encontrado")
+
+    text = report.final_text or report.generated_text or ""
+    if not text:
+        raise HTTPException(status_code=400, detail="Laudo sem texto gerado")
+
+    patient = exam.patient
+
+    # Gerar PDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=20)
+
+    # Header
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "LAUDO DE ELETROENCEFALOGRAMA", ln=True, align="C")
+    pdf.ln(5)
+
+    # Info do paciente
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, f"Paciente: {patient.name if patient else 'N/A'}", ln=True)
+    pdf.cell(0, 6, f"Data do exame: {exam.created_at.strftime('%d/%m/%Y %H:%M') if exam.created_at else 'N/A'}", ln=True)
+    pdf.cell(0, 6, f"Arquivo: {exam.file_name or 'N/A'}", ln=True)
+
+    status_label = {"draft": "Rascunho", "review": "Em revisao", "approved": "Aprovado"}
+    pdf.cell(0, 6, f"Status: {status_label.get(report.status.value if hasattr(report.status, 'value') else report.status, report.status)}", ln=True)
+
+    if report.approved_at:
+        pdf.cell(0, 6, f"Aprovado em: {report.approved_at.strftime('%d/%m/%Y %H:%M')}", ln=True)
+
+    pdf.ln(5)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
+
+    # Corpo do laudo
+    pdf.set_font("Helvetica", "", 11)
+    for line in text.split("\n"):
+        clean = line.replace("**", "")
+        if line.startswith("**") and line.endswith("**"):
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.multi_cell(0, 6, clean)
+            pdf.set_font("Helvetica", "", 11)
+        elif clean.strip().startswith("#"):
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.multi_cell(0, 7, clean.lstrip("# "))
+            pdf.set_font("Helvetica", "", 11)
+        elif clean.strip() == "":
+            pdf.ln(3)
+        else:
+            pdf.multi_cell(0, 6, clean)
+
+    # Disclaimer
+    if report.disclaimer:
+        pdf.ln(10)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.multi_cell(0, 4, report.disclaimer)
+
+    # Assinatura
+    pdf.ln(15)
+    pdf.line(60, pdf.get_y(), 150, pdf.get_y())
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, "Assinatura do medico responsavel", ln=True, align="C")
+
+    # Rodapé
+    pdf.set_font("Helvetica", "I", 7)
+    pdf.cell(0, 6, f"Gerado por: {report.llm_provider or 'IA'} / {report.llm_model or 'N/A'} | Sistema de Laudos EEG com IA", ln=True, align="C")
+
+    # Exportar
+    pdf_bytes = pdf.output()
+    buffer = io.BytesIO(pdf_bytes)
+    filename = f"laudo_{patient.name.replace(' ', '_') if patient else 'exame'}_{exam_id[:8]}.pdf"
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

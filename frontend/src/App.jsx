@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import UploadPage from './pages/UploadPage'
 import DashboardPage from './pages/DashboardPage'
 import ReportPage from './pages/ReportPage'
+import ReferencesPage from './pages/ReferencesPage'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(
@@ -24,8 +25,7 @@ function App() {
           <h1>🧠 Sistema de Laudos EEG</h1>
           <nav className="header-nav">
             <NavLink to="/" end>Painel</NavLink>
-            <NavLink to="/upload">Novo Exame</NavLink>
-          </nav>
+            <NavLink to="/upload">Novo Exame</NavLink>            <NavLink to="/references">Referências</NavLink>          </nav>
           <button onClick={handleLogout}>Sair</button>
         </div>
       )}
@@ -59,6 +59,14 @@ function App() {
           element={
             isAuthenticated
               ? <ReportPage />
+              : <Navigate to="/login" />
+          }
+        />
+        <Route
+          path="/references"
+          element={
+            isAuthenticated
+              ? <ReferencesPage />
               : <Navigate to="/login" />
           }
         />

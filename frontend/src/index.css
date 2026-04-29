@@ -321,6 +321,11 @@ body {
 
 .btn-success:hover { background: #1b5e20; }
 
+.btn-danger {
+  background: #c62828;
+}
+.btn-danger:hover { background: #b71c1c; }
+
 .btn-link {
   background: none;
   border: none;
