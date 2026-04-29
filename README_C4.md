@@ -477,23 +477,49 @@ flowchart LR
         GET_REP["GET /:id/report"]
         PUT_REP["PUT /:id/report"]
         POST_APR["POST /:id/report/approve"]
+        GET_PDF["GET /:id/report/pdf"]
     end
 
     subgraph REFS ["📚 References"]
         POST_PDF["POST /upload-pdf"]
         GET_SRC["GET /sources"]
         GET_STAT["GET /stats"]
+        DEL_SRC["DELETE /sources/:name"]
     end
 
     POST_UP -->|"arquivo .EDF"| POST_AN
     POST_AN -->|"análise pronta"| POST_GEN
     POST_GEN -->|"laudo gerado"| PUT_REP
     PUT_REP -->|"texto revisado"| POST_APR
+    POST_APR -->|"laudo aprovado"| GET_PDF
 
     style AUTH fill:#5c6bc0,stroke:#283593,stroke-width:2px,color:#ffffff
     style PATIENTS fill:#26a69a,stroke:#00796b,stroke-width:2px,color:#ffffff
     style EXAMS fill:#ff7043,stroke:#d84315,stroke-width:2px,color:#ffffff
     style REFS fill:#ab47bc,stroke:#6a1b9a,stroke-width:2px,color:#ffffff
+```
+
+---
+
+## 🧪 Testes E2E
+
+O sistema possui **dois níveis de testes** que rodam contra **produção real**:
+
+| Tipo | Ferramenta | Testes | O que valida |
+|---|---|---|---|
+| **API** | Python + httpx | 24 | Backend endpoints (auth, CRUD, RAG, CORS, segurança) |
+| **UI** | Playwright + Chromium | 40 | Frontend completo (login, navegação, botões, formulários, PDF) |
+
+Ambos validam a aplicação **em produção** (Render + Vercel), garantindo que deploy, build, banco, storage e LLM estão funcionais.
+
+```bash
+# Testes de API
+python test_e2e_prod.py --verbose
+
+# Testes de UI (frontend)
+cd frontend
+npm run test:e2e            # headless
+npm run test:e2e:headed     # com browser visível
 ```
 
 ---

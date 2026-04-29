@@ -52,12 +52,18 @@ Sistema de Laudos/
 │   ├── src/
 │   │   ├── pages/
 │   │   │   ├── LoginPage.jsx     # Tela de login
-│   │   │   └── UploadPage.jsx    # Upload + análise + laudo
+│   │   │   ├── DashboardPage.jsx # Painel com listagem de exames
+│   │   │   ├── UploadPage.jsx    # Upload + análise + laudo
+│   │   │   ├── ReportPage.jsx    # Visualização/edição/aprovação de laudo
+│   │   │   └── ReferencesPage.jsx # Gerenciamento de referências RAG
 │   │   ├── services/
 │   │   │   └── api.js            # Cliente HTTP (axios)
 │   │   ├── App.jsx               # Roteamento
 │   │   ├── main.jsx              # Entrada
 │   │   └── index.css             # Estilos
+│   ├── e2e/                      # Testes E2E (Playwright)
+│   │   └── app.spec.js           # 40 testes de UI contra produção
+│   ├── playwright.config.js      # Configuração Playwright
 │   ├── package.json
 │   └── vite.config.js
 ├── docs/                         # Documentos do projeto (PDFs, escopo)
@@ -188,6 +194,54 @@ Todas as integrações são configuráveis via `.env`:
 
 ---
 
+## 🧪 Testes
+
+O projeto conta com **dois níveis de testes E2E** que rodam **diretamente contra produção**:
+
+### Testes de API (Backend)
+
+Validam todos os endpoints da API em produção via HTTP direto (sem browser):
+
+```bash
+python test_e2e_prod.py --verbose
+```
+
+**24 testes** cobrindo: health, autenticação, pacientes, exames, laudos, RAG, storage, CORS e segurança.
+
+### Testes de UI (Frontend + Backend)
+
+Validam a aplicação completa via browser real (Playwright/Chromium) contra produção:
+
+```bash
+cd frontend
+npm run test:e2e            # headless (CI)
+npm run test:e2e:headed     # com browser visível (debug)
+npm run test:e2e:report     # abrir relatório HTML
+```
+
+**40 testes** cobrindo:
+
+| Suite | O que valida |
+|---|---|
+| 1. Login | Formulário, login válido/inválido, redirect sem auth |
+| 2. Navegação | Header, links (Painel, Upload, Referências), logout |
+| 3. Dashboard | Listagem de exames, status, botões de ação |
+| 4. Upload | Formulário, validação de campos, aceita .EDF |
+| 5. Laudo | Visualização, edição, cancelar, aprovar, exportar PDF |
+| 6. Referências RAG | Stats, upload de PDF, fontes cadastradas, remoção |
+| 7. UI/UX | Título, console sem erros, loading states |
+| 8. Integração | Dados reais da API chegam ao frontend |
+
+### Onde rodam
+
+Ambos os testes rodam **contra os ambientes de produção**:
+- Backend: `https://eeg-laudos-api.onrender.com`
+- Frontend: `https://sistemalaudos.vercel.app`
+
+Isso garante que o sistema inteiro — deploy, build, banco, storage, LLM — está funcional.
+
+---
+
 ## 🐳 Com Docker (alternativa)
 
 Se preferir usar Docker:
@@ -216,9 +270,14 @@ Acesse:
 | `POST` | `/api/patients/` | Criar paciente |
 | `GET` | `/api/patients/` | Listar pacientes |
 | `POST` | `/api/exams/upload` | Upload de arquivo .EDF |
+| `GET` | `/api/exams/` | Listar exames |
+| `GET` | `/api/exams/{id}` | Detalhes do exame |
 | `POST` | `/api/exams/{id}/analyze` | Analisar exame com IA |
 | `POST` | `/api/exams/{id}/generate-report` | Gerar laudo |
 | `GET` | `/api/exams/{id}/report` | Ver laudo gerado |
+| `PUT` | `/api/exams/{id}/report` | Editar texto do laudo |
+| `POST` | `/api/exams/{id}/report/approve` | Aprovar laudo (assinatura) |
+| `GET` | `/api/exams/{id}/report/pdf` | Baixar laudo em PDF |
 | `POST` | `/api/references/upload-pdf` | Upload de livro/referência médica |
 | `GET` | `/api/references/sources` | Listar fontes de referência |
 | `GET` | `/api/references/stats` | Estatísticas do RAG |
