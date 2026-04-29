@@ -327,4 +327,9 @@ Sem a API key, o laudo gerado será um texto de exemplo (mock).
 
 ## 📝 Licença
 
-Projeto privado — uso exclusivo.
+Software proprietário — **Todos os direitos reservados.**
+
+**© 2026 Michel Bueno Silva e Matheus Bueno Ribeiro da Silva**
+
+Consulte o arquivo [LICENSE](LICENSE) para detalhes completos.
+Documentação de registro: [docs/REGISTRO_PROPRIEDADE_INTELECTUAL.md](docs/REGISTRO_PROPRIEDADE_INTELECTUAL.md)
