@@ -167,6 +167,21 @@ async def generate_exam_report(
     if not analysis:
         raise HTTPException(status_code=400, detail="Execute a análise primeiro (/api/exams/{id}/analyze)")
 
+    # Remover laudo anterior (re-geração)
+    old_report = await db.execute(select(Report).where(Report.exam_id == exam_id))
+    old = old_report.scalar_one_or_none()
+    if old:
+        # Remover embedding associado ao laudo antigo
+        from backend.app.models.models import ReportEmbedding
+        old_emb = await db.execute(
+            select(ReportEmbedding).where(ReportEmbedding.report_id == old.id)
+        )
+        old_emb_row = old_emb.scalar_one_or_none()
+        if old_emb_row:
+            await db.delete(old_emb_row)
+        await db.delete(old)
+        await db.flush()
+
     # Calcular idade do paciente
     patient = exam.patient
     age_str = "Não informada"
